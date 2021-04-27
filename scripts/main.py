@@ -1,7 +1,8 @@
 from typing import List, Dict, Any, Optional
 from enum import Enum
 from fastapi import FastAPI
-from fastapi.middleware.cors import CORSMiddleware
+from starlette.middleware import Middleware
+from starlette.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field
 from spacy import load as spacy_load
 from spacy.tokens import Doc
@@ -9,13 +10,14 @@ from dependency_extraction import findSVs, findSVOs, findSVAOs
 
 nlp = spacy_load("en_core_web_md")
 
+middleware = [Middleware(CORSMiddleware, allow_origins=["*"], allow_methods=("GET", "POST"))]
+
 # Set up the FastAPI app and define the endpoints
-app = FastAPI()
-app.add_middleware(CORSMiddleware, allow_origins=["*"])
+app = FastAPI(middleware=middleware)
 
 
 # https://universaldependencies.org/u/pos/
-POS_MAPPING = ["ADJ","ADP","ADV","AUX","CCONJ","DET","INTJ","NOUN","NUM","PART","PRON","PROPN","PUNCT","SCONJ","SYM","VERB","X"]
+POS_MAPPING = ["ADJ","ADP","ADV","AUX","CCONJ","DET","EOL","INTJ","NOUN","NUM","PART","PRON","PROPN","PUNCT","SCONJ","SPACE","SYM","VERB","X"]
 
 
 class ProcessRequestModel(BaseModel):
