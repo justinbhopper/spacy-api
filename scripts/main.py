@@ -1,23 +1,28 @@
-from typing import List, Dict, Any
+from typing import List, Dict, Any, Optional
 from enum import Enum
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from pydantic import BaseModel
-import spacy
+from pydantic import BaseModel, Field
+from spacy import load as spacy_load
 from spacy.tokens import Doc
+from dependency_extraction import findSVs, findSVOs, findSVAOs
 
-nlp = spacy.load("en_core_web_md")
+nlp = spacy_load("en_core_web_md")
+
+# Set up the FastAPI app and define the endpoints
+app = FastAPI()
+app.add_middleware(CORSMiddleware, allow_origins=["*"])
 
 
 # https://universaldependencies.org/u/pos/
 POS_MAPPING = ["ADJ","ADP","ADV","AUX","CCONJ","DET","INTJ","NOUN","NUM","PART","PRON","PROPN","PUNCT","SCONJ","SYM","VERB","X"]
 
 
-class RequestModel(BaseModel):
+class ProcessRequestModel(BaseModel):
     articles: List[str]
 
 
-class ResponseModel(BaseModel):
+class ProcessResponseModel(BaseModel):
     class Batch(BaseModel):
         class Entity(BaseModel):
             tokens: List[int]
@@ -35,7 +40,7 @@ class ResponseModel(BaseModel):
     result: List[Batch]
 
 
-def get_data(doc: Doc) -> Dict[str, Any]:
+def create_process_response(doc: Doc) -> Dict[str, Any]:
     ents = [
         {
             "tokens": [token.i for token in ent],
@@ -66,17 +71,37 @@ def get_data(doc: Doc) -> Dict[str, Any]:
     }
 
 
-# Set up the FastAPI app and define the endpoints
-app = FastAPI()
-app.add_middleware(CORSMiddleware, allow_origins=["*"])
-
-
-@app.post("/process", summary="Process batches of text", response_model=ResponseModel)
-def process_articles(query: RequestModel):
+@app.post("/process", summary="Process batches of text", response_model=ProcessResponseModel)
+def process_articles(query: ProcessRequestModel):
     """Process a batch of articles and return the entities predicted by the
     given model. Each record in the data should have a key "text".
     """
     response_body = []
     for doc in nlp.pipe(query.articles):
-        response_body.append(get_data(doc))
+        response_body.append(create_process_response(doc))
     return {"result": response_body}
+
+
+class SubjectVerbRequestModel(BaseModel):
+    articles: List[str] = Field(..., title="Text to search")
+    subjects: Optional[List[str]] = Field(None, title="Find matches only for the given subject lemmas")
+    verbs: Optional[List[str]] = Field(None, title="Find matches only for the given verb lemmas")
+
+
+class SubjectVerbResponseModel(BaseModel):
+    class ArticleResult(BaseModel):
+        subjectVerbs: List[List[str]]
+
+    result: List[ArticleResult]
+
+
+@app.post("/subject-verbs", summary="Finds subject-verb combinations", response_model=SubjectVerbResponseModel)
+def find_subject_verbs(query: SubjectVerbRequestModel):
+    result = []
+    for doc in nlp.pipe(query.articles):
+        subjectVerbs = []
+        for pair in findSVs(doc, query.subjects, query.verbs):
+            sub, verb = pair
+            subjectVerbs.append([sub, verb])
+        result.append({"subjectVerbs": subjectVerbs})
+    return {"result": result}
