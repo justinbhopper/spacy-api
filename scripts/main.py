@@ -17,7 +17,7 @@ app = FastAPI(middleware=middleware)
 
 
 # https://universaldependencies.org/u/pos/
-POS_MAPPING = ["ADJ","ADP","ADV","AUX","CCONJ","DET","EOL","INTJ","NOUN","NUM","PART","PRON","PROPN","PUNCT","SCONJ","SPACE","SYM","VERB","X"]
+POS_MAPPING = ["ADJ","ADP","ADV","AUX","CONJ","CCONJ","DET","EOL","INTJ","NOUN","NUM","PART","PRON","PROPN","PUNCT","SCONJ","SPACE","SYM","VERB","X"]
 
 
 class ProcessRequestModel(BaseModel):
