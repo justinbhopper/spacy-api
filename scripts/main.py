@@ -1,9 +1,11 @@
 from typing import List, Dict, Any, Optional
 from enum import Enum
 from fastapi import FastAPI
+from fastapi.responses import JSONResponse
 from starlette.middleware import Middleware
 from starlette.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field
+from lemminflect import isTagBaseForm, getLemma, getAllInflections, getAllInflectionsOOV
 from spacy import load as spacy_load
 from spacy.tokens import Doc
 from dependency_extraction import findSVs, findSVOs, findSVAOs
@@ -84,26 +86,48 @@ def process_articles(query: ProcessRequestModel):
     return {"result": response_body}
 
 
-class SubjectVerbRequestModel(BaseModel):
-    articles: List[str] = Field(..., title="Text to search")
-    subjects: Optional[List[str]] = Field(None, title="Find matches only for the given subject lemmas")
-    verbs: Optional[List[str]] = Field(None, title="Find matches only for the given verb lemmas")
+class PartOfSpeech(str, Enum):
+    NOUN = 'NOUN' # Noun, singular
+    NNS = 'NNS' # Noun, plural
+    ADJ = 'ADJ' # Adjective
+    VERB = 'VERB' # Verb
+    VBD = 'VBD' # Verb, past tense
 
 
-class SubjectVerbResponseModel(BaseModel):
-    class ArticleResult(BaseModel):
-        subjectVerbs: List[List[str]]
-
-    result: List[ArticleResult]
+class LemmaResponseModel(BaseModel):
+    lemma: str
+    inflections: Dict[str, List[str]]
 
 
-@app.post("/subject-verbs", summary="Finds subject-verb combinations", response_model=SubjectVerbResponseModel)
-def find_subject_verbs(query: SubjectVerbRequestModel):
-    result = []
-    for doc in nlp.pipe(query.articles):
-        subjectVerbs = []
-        for pair in findSVs(doc, query.subjects, query.verbs):
-            sub, verb = pair
-            subjectVerbs.append([sub, verb])
-        result.append({"subjectVerbs": subjectVerbs})
-    return {"result": result}
+def merge_inflections(left, right):
+    result = {}
+
+    for pos in left:
+        spellings = left[pos]
+        result[pos] = spellings
+
+    for pos in right:
+        if (pos not in result):
+            result[pos] = right[pos]
+
+    return result
+
+
+@app.get("/inflections", summary="Returns the lemmas of a given word", response_model=LemmaResponseModel)
+def get_lemmas(word: str, pos: PartOfSpeech):
+    word = word.lower()
+
+    if (" " in word or "." in word):
+        return JSONResponse (status_code = 200, content = {"message": "Input must contain only a single word without spaces or punctuation."})
+
+    # Get the basic lemma version of the word first
+    lemmas = getLemma(word, pos)
+    if len(lemmas) > 0:
+        lemma = getLemma(word, pos)[0]
+    else:
+        lemma = word
+
+    inflections = merge_inflections(getAllInflections(lemma, upos=pos), getAllInflectionsOOV(lemma, upos=pos))
+    
+    return {"lemma": lemma, "inflections": inflections}
+    
