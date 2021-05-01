@@ -87,11 +87,10 @@ def process_articles(query: ProcessRequestModel):
 
 
 class PartOfSpeech(str, Enum):
-    NOUN = 'NOUN' # Noun, singular
-    NNS = 'NNS' # Noun, plural
+    NOUN = 'NOUN' # Noun
     ADJ = 'ADJ' # Adjective
     VERB = 'VERB' # Verb
-    VBD = 'VBD' # Verb, past tense
+    ADV = 'ADV' # Adverb
 
 
 class LemmaResponseModel(BaseModel):
