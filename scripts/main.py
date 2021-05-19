@@ -8,7 +8,6 @@ from pydantic import BaseModel, Field
 from lemminflect import isTagBaseForm, getLemma, getAllInflections, getAllInflectionsOOV
 from spacy import load as spacy_load
 from spacy.tokens import Doc
-from dependency_extraction import findSVs, findSVOs, findSVAOs
 
 nlp = spacy_load("en_core_web_md")
 
